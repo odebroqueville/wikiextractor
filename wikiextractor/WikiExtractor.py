@@ -63,12 +63,12 @@ from io import StringIO
 from multiprocessing import Queue, Process, cpu_count
 from timeit import default_timer
 
-from .extract import Extractor, ignoreTag, define_template, acceptedNamespaces
+from extract import Extractor, ignoreTag, define_template, acceptedNamespaces
 
 # ===========================================================================
 
 # Program version
-__version__ = '3.0.5'
+__version__ = '3.0.6'
 
 ##
 # Defined in <siteinfo>
@@ -160,7 +160,8 @@ class OutputSplitter():
         self.nextFile = nextFile
         self.compress = compress
         self.max_file_size = max_file_size
-        self.file = self.open(self.nextFile.next())
+        self.file = self.nextFile.next()
+        self.file_is_open = False
 
     def reserve(self, size):
         if self.file.tell() + size > self.max_file_size:
@@ -168,6 +169,9 @@ class OutputSplitter():
             self.file = self.open(self.nextFile.next())
 
     def write(self, data):
+        if not self.file_is_open:
+            self.file = self.open(self.file)
+            self.file_is_open = True
         self.reserve(len(data))
         if self.compress:
             self.file.write(data.encode('utf-8'))
@@ -175,7 +179,8 @@ class OutputSplitter():
             self.file.write(data)
 
     def close(self):
-        self.file.close()
+        if self.file_is_open:
+            self.file.close()
 
     def open(self, filename):
         if self.compress:
@@ -480,7 +485,6 @@ def reduce_process(output_queue, output):
     :param output_queue: text to be output.
     :param output: file object where to print.
     """
-
     interval_start = default_timer()
     period = 100000
     # FIXME: use a heap
